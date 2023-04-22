@@ -1,31 +1,34 @@
 # Overview
 
-This plugin enables turning your Kong API Gateway into an event source. It can be configured to take API logs and relay them to configurable Kafka topics, supporting the CloudEvents format. It also supports authentication to Kafka using SASL/PLAIN (and therefore supports confluent cloud)
+Enable schema (OpenAPI) driven mocking for Kong.
+
+# Features
+
+- Supports 3 modes:
+  - auto: Automatically generates mocks using Lua faker, based on the determined response schema
+  - example_literal: Uses response examples
+  - example_template: Supports template variables (request context, API caller info and several random generator functions)
+- Supports request validation
+  - with type coercion
+  - optionally ignore extraneous parameters
+- OpenaAPI support
+  - Full OpenAPI 3.0 support with references
+  - Supports schema format hints
+  - enums
+  - oneOf, anyOf, allOf  
 
 # Installation
 
 ```
-luarocks install kong-event-pub
+luarocks install kong-mocking-advanced
 ```
 
 # Configuration
 
 | Parameter | Default  | Required | description |
 | --------- | -------- | -------- | ----------- |
-| config.bootstrap_servers | | Yes | Kafka Bootstrap |
-| config.port | 9092 | Yes | Kafka port |
-| config.ssl | true | Yes | Whether SSL/TLS is enabled |
-| config.sasl_mechanism | PLAIN | yes | Presently only PLAIN is supported; Support for Kerberos, SCRAM-SHA-512 coming up |
-| config.sasl_user | | Yes | SASL Username |
-| config.sasl_password | | Yes | SASL Password |
-| encoding | application/json | Yes | Encoding of the data. Presently only JSON is supported; Avro will follow |
-| format | CloudEventsKafkaProtocolBinding | Yes | Cloud events protocol binding. Defaults to Kafka; Other mechanisms maybe supported later | 
-| config.eventmaps[] | | Yes | Array of destination inputs. Each takes the following parameters to perform event map matches; request_path_match, position, http_method, response_codes (array), destination_topic, key, data |
-| config.dlc | No | No | A Dead-letter channel to send unmatched events to |
-
-# Future Features
-
-- Fully Configurable Message Payload Callbacks
-- Transformation Callbacks
-- Avro & Confluent Schema Registry Support
+| config.oas3_spec | | Yes | HTTP/S or Local file path |
+| config.mode | auto | No | can be example_literal, example_template or auto |
+| config.validate_requests | false | no | Whether to validate requests |
+| config.response_code_hint_source | x-kong-response-code | no | Clients can hint which rsponse code is desired. Relevantly when validate_requests is turned of and mode is auto |
 
