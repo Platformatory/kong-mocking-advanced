@@ -1,0 +1,17 @@
+_format_version: "2.1"
+services:
+- name: petstore
+  url: http://petstore.swagger.io/v2
+  routes:
+  - name: petstore
+    paths: 
+    - /
+plugins:
+  - name: kong-mocking-advanced
+    enabled: yes
+    route: petstore
+    config: 
+      #oas3_spec: /opt/conf/spec/kong-mocking-advanced/configs/petstore-examples.yaml
+      oas3_spec: https://raw.githubusercontent.com/OAI/OpenAPI-Specification/main/examples/v3.0/petstore-expanded.yaml
+      validate_requests: true
+      mode: auto
