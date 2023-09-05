@@ -10,7 +10,8 @@ networks:
 services:
 
   kong:
-    image: "${KONG_DOCKER_TAG:-kong:3.2.2-alpine}"
+    build: .
+    #image: "${KONG_DOCKER_TAG:-kong/kong:3.4.0-rhel}"
     user: "${KONG_USER:-kong}"
     environment:
       KONG_DECLARATIVE_CONFIG: /opt/conf/kong.yml
@@ -22,6 +23,7 @@ services:
       KONG_PROXY_ERROR_LOG: /dev/stderr
       KONG_PLUGINS: kong-mocking-advanced
       KONG_LOG_LEVEL: 'debug'
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
       #KONG_LUA_PACKAGE_PATH: '/usr/local/kong/kong-mocking-advanced;'
     networks:
       - kong-net
