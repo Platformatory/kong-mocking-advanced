@@ -6,7 +6,7 @@ supported_platforms = {"linux"}
 
 source = {
   url = "git+https://github.com/Platformatory/kong-mocking-advanced.git",
-  tag = "1.0.0"
+  tag = "main"
 }
 
 description = {
@@ -19,7 +19,8 @@ dependencies = {
   "faker = 0.0.1-1",
 --  "lyaml = 6.2.8-1",
   "aspect = 2.3-0",
-  "lua-resty-ljsonschema = 1.1.3-1"
+  "lua-resty-ljsonschema = 1.1.3-1",
+  "lua-openai = 1.2.0-1" 
 }
 
 build = {
