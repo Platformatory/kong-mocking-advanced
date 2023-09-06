@@ -21,7 +21,7 @@ function oas3_utils.read_spec_from_input(input)
       return nil, "Failed to open file: " .. err
     end
     file = file:read("*a")
-    file:close()
+    --file:close() probably garbage collected sometime
   end
   return file
 end

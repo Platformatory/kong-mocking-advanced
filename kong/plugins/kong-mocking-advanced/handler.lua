@@ -1,3 +1,4 @@
+local http = require "resty.http"
 local json = require "cjson.safe"
 local cjson = require("cjson")
 local yaml = require("lyaml")
@@ -8,7 +9,141 @@ local aspect = require("aspect.template").new({ debug = true })
 local jsonschema = require("resty.ljsonschema")
 local oas3_utils = require("kong.plugins.kong-mocking-advanced.oas3-utils")
 local faker_exts = require("kong.plugins.kong-mocking-advanced.faker-exts")
+local openai = require("openai")
+
 local KongMockingHandler = {}
+
+local function call_openai_mock_fn(openai_api_key, model_name, temperature, schema, messages, mock_fn_description)
+  kong.log.inspect(openai_api_key)
+  kong.log.inspect(model_name)
+  kong.log.inspect(temperature)
+  kong.log.inspect(schema)
+  kong.log.inspect(messages)
+  kong.log.inspect(mock_fn_description)
+
+  local client = http.new()
+
+  local payload = {
+    model = model_name,
+    temperature = temperature,
+    messages = messages, -- Assuming messages is already a Lua table
+    functions = {
+      {
+        name = "mock",
+        description = mock_fn_description,
+        parameters = schema -- Assuming schema is already a Lua table
+      }
+    },
+    function_call = { name = "mock" } 
+  }
+
+  local res, err = client:request_uri("https://api.openai.com/v1/chat/completions", {
+    method = "POST",
+    body = cjson.encode(payload),  -- Kong ships with 'cjson' by default
+    headers = {
+      ["Content-Type"] = "application/json",
+      ["Authorization"] = "Bearer " .. openai_api_key
+    },
+    ssl_verify = true  -- Change to false if you want to skip SSL verification (not recommended)
+  })
+
+  if not res then
+    kong.log.err("Request failed: ", err)
+    return nil, err
+  end
+
+  if res.status ~= 200 then
+    kong.log.err("Request failed, status: ", res.status, ", body: ", res.body)
+    return nil, "API request failed"
+  end
+
+  local response_body = cjson.decode(res.body)  -- Decode the JSON response body
+  kong.log.inspect(response_body)
+  -- Navigate to the 'choices' -> 'message' -> 'function_call' -> 'arguments' field
+  local arguments_str
+  local json_response
+
+    if response_body.choices and 
+      response_body.choices[1] and 
+      response_body.choices[1].message and 
+      response_body.choices[1].message.function_call and 
+      response_body.choices[1].message.function_call.arguments then
+        arguments_str = response_body.choices[1].message.function_call.arguments
+    end
+
+    if arguments_str then
+    -- Check if 'arguments_str' is a valid JSON string    if arguments_str then
+        json_response, err = cjson.decode(arguments_str)
+        if not json_response then
+            kong.log.inspect("Error decoding arguments from JSON: ", err)
+        else
+            kong.log.inspect("Arguments are valid JSON: ", arguments_str)
+        end
+    else
+        kong.log.inspect("Arguments field not found or is nil")
+    end
+
+    kong.log.inspect(json_response)
+    return json_response
+end
+
+local function template_compile(str, data)
+  -- search for placeholders enclosed in double curly braces
+  return (string.gsub(str, '{{%s*(.-)%s*}}', function(match)
+    local value = data
+    for key in string.gmatch(match, '([^%.]+)') do
+      value = value[key:gsub('[%[%]]', '')]
+      kong.log.inspect(value)
+      if not value then
+        return ''
+      end
+    end
+    return value
+  end))
+end
+
+local function replace_prompt_placeholders(openai_prompt_messages, context)
+  local updated_messages = {}
+
+  for _, message in ipairs(openai_prompt_messages) do
+    local new_content = template_compile(message.content, context)
+    table.insert(updated_messages, { role = message.role, content = new_content })
+  end
+
+  return updated_messages
+end
+
+
+local function openai_call_mocking_function(openai_api_key, openai_model, schema, context)
+  local oaiclient = openai.new(openai_api_key)
+  kong.log.inspect(oaiclient)
+  local chat = oaiclient:new_chat_session({
+    temperature = 0,
+    model = "gpt-3.5-turbo-0613",
+    --model = "gpt-4-0613",
+    messages = {
+      {
+        role = "system",
+        content = "You are a mock generator that can generate mocks based on a provided API schema and provided context"
+      },
+    functions = {
+      { name = "mock", description = "Mock the given JSON schema input", parameters = schema },
+    }
+  }
+  })
+  local res = chat:send({role = "function", name = "mock", content = cjson.encode("Using the provided mock function, generate an intelligent random response")})
+  kong.log.inspect(res)
+  if type(res) == "table" and res.function_call then
+      kong.log.inspect(res)
+      -- The function_call object has the following fields:
+      --   function_call.name --> name of function to be called
+      --   function_call.arguments --> A string in JSON format that should match the parameter specification
+      -- Note that res may also include a content field if the LLM produced a textual output as well
+      local name = res.function_call.name
+      local arguments = cjson.decode(res.function_call.arguments)
+      -- ... compute the result and send it back ...
+  end
+end
 
 local function determine_response_model(path, verb, content_type, expected_response_code, resolved_spec)
   local exact_match = resolved_spec.paths[path] and resolved_spec.paths[path][verb] and
@@ -274,6 +409,7 @@ end
 local fake = faker:new()
 
 local function kong_faker_mock_response(schema)
+  kong.log.inspect(schema)
   if schema.oneOf then
     local selected_schema = schema.oneOf[math.random(#schema.oneOf)]
     return kong_faker_mock_response(selected_schema)
@@ -540,15 +676,20 @@ function KongMockingHandler:access(conf)
 
   local response_body = {}
 
-  if conf.mode == 'auto' then
+  if conf.mode == 'auto' or conf.mode == 'auto-agent' then
     local response_model = determine_response_model(path, verb:lower(), content_type, response_hint, resolved_spec)
-    kong.log.inspect(response_model)
     if not response_model then
-      kong.response.exit(200,
-      "The mocking plugin was unable to determine a response schema. Please check your OpenAPI spec.")
+      kong.response.exit(200, "The mocking plugin was unable to determine a response schema. Please check your OpenAPI spec.")
     end
-
-    response_body = kong_faker_mock_response(response_model)
+    if conf.mode == 'auto-agent' then
+      --TODO: get this from conf and validate JSON before cosuming here
+      local messages = replace_prompt_placeholders(conf.openai_prompt_messages, context)
+      -- TODO: some error handling here 
+      -- TODO: get openai_model from conf
+      response_body = call_openai_mock_fn(conf.openai_api_key, conf.openai_model, conf.openai_model_temperature, response_model, messages, conf.openai_mock_fn_description)
+    elseif conf.mode == 'auto' then   
+      response_body = kong_faker_mock_response(response_model)
+    end  
     if content_type == 'application/xml' then
       response_body = table_to_xml(response_body, 'response')
     end

@@ -1,17 +1,27 @@
 _format_version: "2.1"
 services:
-- name: petstore
-  url: http://petstore.swagger.io/v2
+- name: customer360
+  url: http://path.to.nowhere/
   routes:
-  - name: petstore
+  - name: customer360
     paths: 
     - /
 plugins:
   - name: kong-mocking-advanced
     enabled: yes
-    route: petstore
+    route: customer360
     config: 
-      #oas3_spec: /opt/conf/spec/kong-mocking-advanced/configs/petstore-examples.yaml
-      oas3_spec: https://raw.githubusercontent.com/OAI/OpenAPI-Specification/main/examples/v3.0/petstore-expanded.yaml
+      oas3_spec: /opt/conf/spec/kong-mocking-advanced/configs/customer360.yaml
+      #oas3_spec: /opt/conf/spec/kong-mocking-advanced/configs/simple-petstore.yaml
+      #oas3_spec: https://raw.githubusercontent.com/OAI/OpenAPI-Specification/main/examples/v3.0/petstore-expanded.yaml
       validate_requests: true
       mode: auto
+      openai_api_key: "{vault://env/openai-api-key}"
+      openai_model: gpt-4-0613
+      openai_model_temperature: 0.7
+      openai_mock_fn_description: "Given the JSON schema, generate mock data based on the context"
+      openai_prompt_messages:
+        - role: "system"
+          content: "You are a helpful model that generates mocks based on request context and schema provided."
+        - role: "user"
+          content: "The user just made a {{request.method}} request to the Customer API on the path {{request.path}} with the context {{request.query.context}}. Provide me an intelligent mock response."      
