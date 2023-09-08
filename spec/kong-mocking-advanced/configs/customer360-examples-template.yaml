@@ -1,0 +1,119 @@
+openapi: 3.0.0
+info:
+  title: Customer API
+  version: 1.0.0
+
+paths:
+  /customers:
+    get:
+      summary: Search for customers
+      parameters:
+        - name: name
+          in: query
+          description: Name to search for
+          required: false
+          schema:
+            type: string
+          example: "John"
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Customer'
+              examples:
+                SingleMatch:
+                  value: [
+                    {
+                      "id": "{{request.query.customer_id}}",
+                      "name": "{{request.query.name}}",
+                      "email": "john.doe@example.com",
+                      "phoneNumber": "123-456-7890",
+                      "dateOfBirth": "1980-01-01",
+                      "additionalInfo": {
+                        "key1": "value1"
+                      }
+                    }
+                  ]
+
+  /customers/{id}:
+    get:
+      summary: Retrieve a customer by ID
+      parameters:
+        - name: id
+          in: path
+          description: Customer ID
+          required: true
+          schema:
+            type: string
+          example: "1"
+        - name: context
+          in: query
+          description: Context parameter for custom view
+          required: false
+          schema:
+            type: string
+          example: "detailed"
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+              examples:
+                BasicInfo:
+                  value: {
+                    "id": "1",
+                    "name": "John Doe",
+                    "email": "john.doe@example.com",
+                    "phoneNumber": "123-456-7890",
+                    "dateOfBirth": "1980-01-01",
+                    "additionalInfo": {
+                      "key1": "value1"
+                    }
+                  }
+        '404':
+          description: Customer not found
+
+components:
+  schemas:
+    Customer:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "1"
+        name:
+          type: string
+          example: "John Doe"
+          format: "full-name"
+        email:
+          type: string
+          example: "john.doe@example.com"
+          format: "email"
+        phoneNumber:
+          type: string
+          example: "123-456-7890"
+          format: "phone-number"
+        dateOfBirth:
+          type: string
+          example: "1980-01-01"
+          format: "date"
+        additionalInfo:
+          type: object
+          properties:
+            key1:
+              type: string
+              example: "value1"
+            key2:
+              type: string
+              example: "value2"
+            key3:
+              type: string
+              example: "value3"
+          description: "A fixed set of keys for storing additional information."
+

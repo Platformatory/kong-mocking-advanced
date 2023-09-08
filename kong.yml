@@ -11,11 +11,11 @@ plugins:
     enabled: yes
     route: customer360
     config: 
-      oas3_spec: /opt/conf/spec/kong-mocking-advanced/configs/customer360.yaml
-      #oas3_spec: /opt/conf/spec/kong-mocking-advanced/configs/simple-petstore.yaml
-      #oas3_spec: https://raw.githubusercontent.com/OAI/OpenAPI-Specification/main/examples/v3.0/petstore-expanded.yaml
+      #oas3_spec: /opt/conf/spec/kong-mocking-advanced/configs/customer360.yaml
+      #oas3_spec: /opt/conf/spec/kong-mocking-advanced/configs/customer360-examples-literal.yaml
+      oas3_spec: /opt/conf/spec/kong-mocking-advanced/configs/customer360-examples-template.yaml
       validate_requests: true
-      mode: auto
+      mode: auto-agent
       openai_api_key: "{vault://env/openai-api-key}"
       openai_model: gpt-4-0613
       openai_model_temperature: 0.7
